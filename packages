@@ -1,0 +1,75 @@
+install.packages("seqinr")
+install.packages("ape")
+install.packages("phangorn")
+install.packages("Biostrings")
+devtools::install_github("petewarden/abi") 
+library(seqinr)
+library(ape)
+library(Biostrings)
+library(phangorn)
+read_ab1 <- function(file_path) {
+  seq_data <- read.abif(file_path)  # Using 'seqinr' to read AB1 files
+  sequence <- seq_data$SEQ   # Extract the sequence part
+  quality <- seq_data$PHRED  # Extract the quality score part
+  return(list(sequence = sequence, quality = quality))
+}
+
+Function to trim sequences based on quality scores (Phred > 20)
+trim_sequence <- function(sequence, quality, threshold = 20) {
+  good_bases <- quality > threshold
+  trimmed_sequence <- sequence[good_bases]  # Only keep high-quality bases
+  return(trimmed_sequence)
+}
+
+Function to perform de novo assembly using a simple overlap method
+denovo_assembly <- function(sequences) {
+  This is a very basic de novo assembly (in practice, tools like CAP3 are better)
+  assembled_sequence <- sequences[1]
+  for (i in 2:length(sequences)) {
+    overlap_len <- min(100, length(sequences[i]))
+    overlap <- which(assembled_sequence == substr(sequences[i], 1, overlap_len))
+    if (length(overlap) > 0) {
+      assembled_sequence <- paste(assembled_sequence, substr(sequences[i], overlap + 1, nchar(sequences[i])), sep="")
+    }
+  }
+  return(assembled_sequence)
+}
+
+Function to align sequences using ClustalW or MUSCLE (for de novo assembly)
+align_sequences <- function(sequences) {
+  Use the 'ape' package for MSA
+  alignment <- clustalW(sequences)
+  return(alignment)
+}
+
+Function to perform phylogenetic analysis and tree construction
+build_phylogenetic_tree <- function(alignment) {
+  dist_matrix <- dist.alignment(alignment)
+  tree <- nj(dist_matrix)  # Neighbor-joining tree
+  return(tree)
+}
+
+save_results <- function(assembled_sequence, tree, output_dir = "results/") {
+  if (!dir.exists(output_dir)) dir.create(output_dir)
+
+  write.fasta(sequences = list(assembled_sequence), names = "assembled_sequence", file.out = paste0(output_dir, "assembled_sequence.fasta"))
+
+  write.tree(tree, file = paste0(output_dir, "phylogenetic_tree.nwk"))
+  
+  cat("Results saved to", output_dir, "\n")
+}
+
+ab1_file_path <- "your_sample.ab1"  # Replace with your AB1 file
+seq_data <- read_ab1(ab1_file_path)
+
+trimmed_sequence <- trim_sequence(seq_data$sequence, seq_data$quality)
+
+For simplicity, we’re using one sequence here, but you can repeat for other sequences
+assembled_sequence <- denovo_assembly(list(trimmed_sequence))
+
+alignment <- align_sequences(c(assembled_sequence, other_sequences))  # Uncomment if you have more sequences
+
+tree <- build_phylogenetic_tree(alignment)  # Uncomment if you perform alignment
+
+save_results(assembled_sequence, tree)
+
